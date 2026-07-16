@@ -1,4 +1,4 @@
-<!-- === ファイル名: staff_index.html (スタッフシフト確認ポータル) === -->
+<!-- === ファイル名: index.html (スタッフ確認ポータル・構文エラー修正版) === -->
 
 <!DOCTYPE html>
 <html>
@@ -27,14 +27,12 @@
       background-color: #fff;
     }
     
-    /* 💡 強調表示セレクター（オレンジ色の枠線） */
     select.highlight-select {
       border: 2px solid #e67e22;
       color: #e67e22;
       background-color: #fffbf0;
     }
 
-    /* テーブルデザイン (iOSスクロール・日付固定対応) */
     .table-container { overflow: auto; max-height: 70svh; border: 1px solid #ddd; border-radius: 8px; -webkit-overflow-scrolling: touch; }
     table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; }
     th, td { border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px 10px; text-align: center; white-space: nowrap; }
@@ -42,14 +40,12 @@
     td:first-child { position: sticky; left: 0; background: #f8f9fa; font-weight: bold; z-index: 8; border-right: 2px solid #bbb; }
     th:first-child { position: sticky; top: 0; left: 0; background: #0056b3; z-index: 12; border-right: 2px solid #bbb; }
 
-    /* 💡 出勤ありマス（薄緑背景 ＆ 濃緑文字） */
     td.has-shift {
       background-color: #e8f5e9 !important;
       color: #27ae60;
       font-weight: bold;
     }
     
-    /* 月曜定休日（灰色行） */
     .monday-row {
       background-color: #f2f2f2 !important;
     }
@@ -69,13 +65,11 @@
     <p class="desc">自分の名前を選択すると、シフト表の中で出勤列が自動的にハイライトされます。</p>
     
     <div class="select-group">
-      <!-- シフト月切り替え -->
       <select id="targetMonthSelect" onchange="onMonthChange()">
         <option value="latest">📅 最新（今月）のシフトを表示</option>
         <option value="prev">📅 前月のシフトを表示</option>
       </select>
       
-      <!-- 自分強調表示用 -->
       <select id="highlightSelect" class="highlight-select" onchange="onHighlightNameChange()">
         <option value="">👤 自分の名前を選択して強調表示...</option>
       </select>
@@ -115,7 +109,6 @@
     let currentData = null;
     let selectedHighlightName = "";
 
-    // 💡 画面起動時に「最新のスタッフシフト」を自動読み込み
     window.onload = function() {
       loadStaffShiftData("latest");
     };
@@ -140,9 +133,7 @@
       );
     }
 
-    // 💡 カレンダーテーブルの描画
     function renderTable(data) {
-      // 1. 強調表示用プルダウンの中身を最新スタッフ名で自動作成
       const highlightSelect = document.getElementById('highlightSelect');
       let selectHtml = `<option value="">👤 自分の名前を選択して強調表示...</option>`;
       data.names.forEach(name => {
@@ -150,7 +141,6 @@
       });
       highlightSelect.innerHTML = selectHtml;
 
-      // 2. テーブルヘッダーの生成
       let html = '<table><thead><tr><th>日付</th>';
       for (let c = 0; c < data.names.length; c++) {
         html += `<th>
@@ -160,19 +150,16 @@
       }
       html += '</tr></thead><tbody>';
       
-      // 3. 日毎データの生成
       for (let r = 0; r < data.dates.length; r++) {
         const dateStr = data.dates[r].toString();
         const weekStr = data.weekdays[r].toString();
         
-        // 月曜日の行は定休日（Monday-row）
         const rowClass = weekStr.includes('月') ? "monday-row" : "";
         
+        // 💡 修正：開始位置にバックティック（ ` ）を正しく挿入しました
         html += `<tr class="${rowClass}"><td>${dateStr}日<br><small style="color:#666;">(${weekStr})</small></td>`;
         for (let c = 0; c < data.names.length; c++) {
           const val = data.shiftData[r][c] || "";
-          
-          // シフトあり（has-shift）か、空欄か
           const tdClass = val ? "has-shift" : "";
           html += `<td class="${tdClass}">${val}</td>`;
         }
@@ -181,20 +168,17 @@
       html += '</tbody></table>';
       document.getElementById('tableContainer').innerHTML = html;
 
-      // 名前の強調表示が選択されている場合は、自動でハイライトを適用
       if (selectedHighlightName) {
         applyHighlight();
       }
     }
 
-    // 💡 自分の名前の強調表示（黄色枠線）切り替えアクション
     function onHighlightNameChange() {
       selectedHighlightName = document.getElementById('highlightSelect').value;
       applyHighlight();
     }
 
     function applyHighlight() {
-      // 一度すべてのマスのハイライト（枠線）をクリア
       document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => {
         el.style.outline = "";
         el.style.boxShadow = "";
@@ -202,7 +186,6 @@
 
       if (!selectedHighlightName || !currentData) return;
 
-      // 選択された名前が「左から何番目の列（列インデックス）」にあるかを探す
       let colIdx = -1;
       const headers = document.querySelectorAll('#tableContainer th');
       headers.forEach((th, idx) => {
@@ -212,17 +195,14 @@
         }
       });
 
-      // 見つからない場合は処理を終了
       if (colIdx === -1) return;
 
-      // 1. ヘッダーセルをハイライト
       headers[colIdx].style.outline = "3px solid #e67e22";
       headers[colIdx].style.boxShadow = "0 0 10px rgba(230, 126, 34, 0.5)";
 
-      // 2. その列のすべてのセル（日付ごと）をハイライト
       document.querySelectorAll('#tableContainer tbody tr').forEach(row => {
         const cells = row.querySelectorAll('td');
-        const td = cells[colIdx - 1]; // 1列目は「日付列」のため、-1
+        const td = cells[colIdx - 1]; 
         if (td) {
           td.style.outline = "3px solid #e67e22";
         }
