@@ -1,4 +1,4 @@
-<!-- === ファイル名: index.html (スタッフ確認ポータル・構文エラー修正版) === -->
+<!-- === ファイル名: index.html (スタッフ確認ポータル・自己診断セーフティ版) === -->
 
 <!DOCTYPE html>
 <html>
@@ -58,7 +58,14 @@
 </head>
 <body>
 
-  <div id="loadingOverlay">読み込み中...🚗</div>
+  <!-- 💡 白いフリーズを防ぐため、「読み込み中」の中にエラーが長引いた時のための説明を付けました -->
+  <div id="loadingOverlay">
+    <div style="text-align:center;">
+      <p style="font-size:24px; margin:0;">🚗</p>
+      <p style="margin:10px 0 0 0; font-size:16px;">ポータルと接続中...</p>
+      <small style="color:#888; font-size:11px; display:block; margin-top:5px;">※10秒以上かかる場合は自動でタイムアウト表示になります。</small>
+    </div>
+  </div>
 
   <div class="card">
     <h3>👤 スタッフシフト確認ポータル</h3>
@@ -82,16 +89,21 @@
   </div>
 
   <script>
-    // 💡 店長専用ポータルで稼働しているGASのURLをそのまま使用します
+    // 💡 運用中（またはテスト中）の、正しいGASウェブアプリURLをここに設定してください
     const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; 
 
     function callApi(action, params, onSuccess, onFailure) {
+      console.log("API送信開始:", action, params);
       fetch(GAS_URL, {
         method: "POST",
         body: JSON.stringify({ action: action, ...params })
       })
-      .then(response => response.json())
+      .then(response => {
+        console.log("レスポンス受信:", response.status);
+        return response.json();
+      })
       .then(res => {
+        console.log("データ解析完了:", res);
         if (res.status === "success") {
           if (onSuccess) onSuccess(res.data);
         } else {
@@ -99,11 +111,32 @@
         }
       })
       .catch(err => {
+        console.error("通信エラー:", err);
         if (onFailure) onFailure(err);
       });
     }
 
-    function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
+    // 💡 タイムアウト付きローディング表示（真っ白で固まるのを防ぎます）
+    function showLoading() { 
+      document.getElementById('loadingOverlay').style.display = 'flex'; 
+      
+      // ⏱️ 10秒待っても通信が終わらない場合は、強制的に画面を開放してエラーを出します
+      setTimeout(() => {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay.style.display === 'flex') {
+          hideLoading();
+          document.getElementById('tableContainer').innerHTML = `
+            <div style="color:#e74c3c; font-weight:bold; padding:30px; background:#fff5f5; border-radius:8px; border:1px solid #ffcdd2;">
+              ⏱️ 通信接続タイムアウト (CORS制限またはURL不一致)<br><br>
+              <span style="font-weight:normal; font-size:13px; color:#555; text-align:left; display:block; line-height:1.5;">
+                ・HTMLの390行目付近に書いてある <strong>GAS_URL</strong> が、今回新しくデプロイした「テスト用GAS」のURLと完全に合致しているか確認してください。<br>
+                ・GAS（Webアプリ）のデプロイ設定において、アクセスできるユーザーが <strong>「全員（Anyone）」</strong> になっているか確認してください。
+              </span>
+            </div>`;
+        }
+      }, 10000);
+    }
+    
     function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
     let currentData = null;
@@ -156,7 +189,6 @@
         
         const rowClass = weekStr.includes('月') ? "monday-row" : "";
         
-        // 💡 修正：開始位置にバックティック（ ` ）を正しく挿入しました
         html += `<tr class="${rowClass}"><td>${dateStr}日<br><small style="color:#666;">(${weekStr})</small></td>`;
         for (let c = 0; c < data.names.length; c++) {
           const val = data.shiftData[r][c] || "";
