@@ -210,7 +210,9 @@
       applyHighlight();
     }
 
+    // 💡  th と td のインデックスのズレを完全に修正したハイライト処理
     function applyHighlight() {
+      // 一度すべてのマスのハイライト（枠線）をクリア
       document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => {
         el.style.outline = "";
         el.style.boxShadow = "";
@@ -218,6 +220,7 @@
 
       if (!selectedHighlightName || !currentData) return;
 
+      // 選択された名前が「左から何番目の列（列インデックス）」にあるかを探す
       let colIdx = -1;
       const headers = document.querySelectorAll('#tableContainer th');
       headers.forEach((th, idx) => {
@@ -227,14 +230,17 @@
         }
       });
 
+      // 見つからない場合は処理を終了
       if (colIdx === -1) return;
 
+      // 1. ヘッダーセルをハイライト
       headers[colIdx].style.outline = "3px solid #e67e22";
       headers[colIdx].style.boxShadow = "0 0 10px rgba(230, 126, 34, 0.5)";
 
+      // 2. その列のすべてのセル（日付ごと）をハイライト（💡 -1 を完全に排除しました）
       document.querySelectorAll('#tableContainer tbody tr').forEach(row => {
         const cells = row.querySelectorAll('td');
-        const td = cells[colIdx - 1]; 
+        const td = cells[colIdx]; // 💡  th と完全に同じ列インデックス（colIdx）をそのまま指定します
         if (td) {
           td.style.outline = "3px solid #e67e22";
         }
