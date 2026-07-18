@@ -138,7 +138,7 @@
   </div>
 
   <script>
-    // --- SPA ナビゲーション ---
+// --- SPA ナビゲーション ---
     function navTo(pageId) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById(pageId).classList.add('active');
@@ -147,21 +147,92 @@
     function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
-    // --- シフト提出用ロジック ---
-    let currentStaffType = 'free'; // 'fixed' (休み希望型) or 'free' (出勤可能型)
-    let requestData = []; // 日付ごとの入力データ
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; // あなたのGASのURL
+
+    // ==========================================
+    // 1. 初期起動時：社員名簿から名前リストを取得
+    // ==========================================
+    let staffMasterData = []; // 取得したデータを保存するハコ
+
+    window.onload = function() {
+      fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getStaffList' })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'success') {
+          staffMasterData = data.data; // [{name:"Aさん", rule:"月水10:00-19:00"}, ...]
+          const select = document.getElementById('requestNameSelect');
+          select.innerHTML = '<option value="">👤 名前を選択...</option>';
+          
+          staffMasterData.forEach(staff => {
+            const opt = document.createElement('option');
+            opt.value = staff.name;
+            // E列に何かルールが書いてあれば「休み希望ベース」、空欄なら「出勤可能ベース」と表示
+            const typeLabel = staff.rule ? "（休み希望）" : "（出勤ベース）";
+            opt.innerText = `${staff.name} ${typeLabel}`;
+            select.appendChild(opt);
+          });
+        }
+      });
+    };
+
+    // ==========================================
+    // 2. シフト確認画面（原因3の解決）
+    // ==========================================
+    function onMonthChange() {
+      const type = document.getElementById('targetMonthSelect').value;
+      loadStaffShiftData(type);
+    }
+
+    function loadStaffShiftData(type) {
+      document.getElementById('tableContainer').innerHTML = '<div style="padding: 40px 0; color: #888;">読み込み中...</div>';
+      
+      fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'getStaffShiftData', target: type })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'success') {
+          // 取得した2次元配列データからテーブル（表）を組み立てる
+          let html = '<table>';
+          data.data.forEach((row, rowIndex) => {
+            html += '<tr>';
+            row.forEach(cell => {
+              if (rowIndex === 0) html += `<th>${cell}</th>`; // 1行目は見出し
+              else html += `<td>${cell || ""}</td>`; // 空白なら空にする
+            });
+            html += '</tr>';
+          });
+          html += '</table>';
+          document.getElementById('tableContainer').innerHTML = html;
+        } else {
+          document.getElementById('tableContainer').innerHTML = `<div style="color:red;">エラー: ${data.message}</div>`;
+        }
+      })
+      .catch(err => {
+        document.getElementById('tableContainer').innerHTML = `<div style="color:red;">通信エラーが発生しました</div>`;
+      });
+    }
+
+    // ==========================================
+    // 3. シフト提出用のロジック
+    // ==========================================
+    let requestData = [];
     let editingDayIndex = -1;
+    let currentStaffRule = ""; // 選択した人のE列のルールを保持
 
     function startShiftRequest() {
-      const select = document.getElementById('requestNameSelect');
-      const val = select.value;
-      if (!val) { alert("名前を選択してください"); return; }
+      const selectedName = document.getElementById('requestNameSelect').value;
+      if (!selectedName) { alert("名前を選択してください"); return; }
 
-      // 名前によってタイプを判定（実際はGASから取得したマスタデータに持たせると良いです）
-      currentStaffType = val.includes('fixed') ? 'fixed' : 'free';
-      const staffName = val.split('_')[0]; 
+      // 選択された人のデータをマスターから探し出す
+      const staffInfo = staffMasterData.find(s => s.name === selectedName);
+      currentStaffRule = staffInfo ? staffInfo.rule : ""; // E列のルール文字
       
-      document.getElementById('requestingNameDisplay').innerText = `👤 ${staffName} さんの提出画面`;
+      document.getElementById('requestingNameDisplay').innerText = `👤 ${selectedName} さんの提出画面`;
       
       generateSubmitCalendar();
       navTo('page-submit-calendar');
@@ -172,14 +243,12 @@
       grid.innerHTML = '';
       requestData = [];
 
-      // ※本来は翌月の日付と曜日を生成。ここではサンプルで数日分
-      // ＝＝＝ ここから入れ替え ＝＝＝
-      // 来月の日付リストを自動生成する
+      // 来月の日付リストを自動生成
       const today = new Date();
       const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
       const year = nextMonth.getFullYear();
       const month = nextMonth.getMonth() + 1;
-      const lastDay = new Date(year, month, 0).getDate(); // 来月の末日
+      const lastDay = new Date(year, month, 0).getDate(); 
       const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
       
       const targetDays = [];
@@ -187,22 +256,27 @@
         let d = new Date(year, month - 1, i);
         targetDays.push(`${i}日(${dayNames[d.getDay()]})`);
       }
-      // ＝＝＝ ここまで ＝＝＝
 
-      // dummyDays ではなく targetDays をループさせる
+      // カレンダーの各マスの設定
       targetDays.forEach((dayStr, index) => {
         let baseShift = ""; 
-        // （これ以降の if (currentStaffType === 'fixed') { ... の処理はそのまま）
-        if (currentStaffType === 'fixed') {
-          // 固定シフトがある人の初期値（例: 月水は10-19）
-          if(dayStr.includes('月') || dayStr.includes('水')) baseShift = "10:00-19:00";
+        
+        // 【簡易判定】もしルール(E列)に「10:00-19:00」のような文字があり、かつ該当の「曜日」が含まれていたら、それを初期値にする。
+        // ※ルールの書き方によって調整が必要ですが、とりあえず「月水金 10-19」みたいな書き方に対応する簡易版です。
+        if (currentStaffRule) {
+          const dayChar = dayStr.match(/\((.*?)\)/)[1]; // "月" などを抽出
+          if (currentStaffRule.includes(dayChar)) {
+            // E列に書かれている時間を強引に抜き出す（例: 10:00-19:00など）
+            const timeMatch = currentStaffRule.match(/\d{1,2}:\d{2}-\d{1,2}:\d{2}|LAST/);
+            baseShift = timeMatch ? timeMatch[0] : "10:00-19:00"; 
+          }
         }
 
         requestData.push({
           dateStr: dayStr,
-          baseShift: baseShift, // 元々の固定シフト
-          requestedShift: baseShift, // 提出するシフト（初期値はbaseと同じ）
-          isModified: false // 変更が加わったか
+          baseShift: baseShift, 
+          requestedShift: baseShift, 
+          isModified: false
         });
 
         const dayDiv = document.createElement('div');
@@ -214,6 +288,8 @@
 
       renderSubmitGrid();
     }
+
+    // （これより下の renderSubmitGrid, openModal, closeModal, saveModalTime, setModalOff, resetModal, submitRequestToGAS は前回のコードをそのまま貼り付けてください！）
 
     function renderSubmitGrid() {
       requestData.forEach((data, index) => {
