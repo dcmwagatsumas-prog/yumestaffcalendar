@@ -102,10 +102,12 @@
       document.getElementById(pageId).classList.add('active');
     }
 
+    // 【更新】→があってもなくても解析できるように強化
     function parseRuleToMap(ruleStr) {
       const ruleMap = {};
       if (!ruleStr) return ruleMap;
-      const regex = /[（\(]([^）\)]+)[\)）]→【([^】]+)】/g;
+      // (曜日) のあとに「→」があってもなくても【...】をマッチさせる
+      const regex = /[（\(]([^）\)]+)[\)）](?:→)?【([^】]+)】/g;
       let match;
       while ((match = regex.exec(ruleStr)) !== null) {
         const days = match[1].split(/[、，,]/);
@@ -213,9 +215,10 @@
           const currentShift = requestData[i-1].requestedShift;
           if (currentShift && currentShift !== "OFF") {
             if (currentShift.includes('-')) {
-                const [start, end] = currentShift.split('-');
+                let [start, end] = currentShift.split('-');
                 document.getElementById('modalStart').value = start;
-                document.getElementById('modalEnd').value = end;
+                // 【修正】もし終了時間が空ならLASTにする
+                document.getElementById('modalEnd').value = (end === "" ? "LAST" : end);
             } else {
                 document.getElementById('modalStart').value = currentShift; 
                 document.getElementById('modalEnd').value = "LAST";
@@ -248,7 +251,6 @@
     function closeModal() { document.getElementById('timeModal').style.display = 'none'; }
     function onMonthChange() { loadStaffShiftData(document.getElementById('targetMonthSelect').value); }
     
-    // 【修正】通信中の表示とエラーハンドリングを追加
     function submitRequestToGAS() {
       document.getElementById('loadingOverlay').style.display = 'flex';
       fetch(GAS_URL, { 
