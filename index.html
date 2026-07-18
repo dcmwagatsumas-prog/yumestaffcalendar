@@ -27,7 +27,7 @@
     .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
     .time-selectors { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0; }
     select { padding: 10px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
-    #loadingOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; font-weight: bold; }
+    #loadingOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; font-weight: bold; font-size: 20px; }
   </style>
 </head>
 <body>
@@ -211,16 +211,14 @@
           document.getElementById('modalDateLabel').innerText = `${i}日(${dayName})`;
           
           const currentShift = requestData[i-1].requestedShift;
-          // 【修正】単独時間（12:00など）の場合の処理を追加
           if (currentShift && currentShift !== "OFF") {
             if (currentShift.includes('-')) {
                 const [start, end] = currentShift.split('-');
                 document.getElementById('modalStart').value = start;
                 document.getElementById('modalEnd').value = end;
             } else {
-                // 12:00のような単独表記の場合
                 document.getElementById('modalStart').value = currentShift; 
-                document.getElementById('modalEnd').value = "LAST"; // デフォルトでLASTなどをセット
+                document.getElementById('modalEnd').value = "LAST";
             }
           } else {
             document.getElementById('modalStart').value = "10:00";
@@ -250,10 +248,25 @@
     function closeModal() { document.getElementById('timeModal').style.display = 'none'; }
     function onMonthChange() { loadStaffShiftData(document.getElementById('targetMonthSelect').value); }
     
+    // 【修正】通信中の表示とエラーハンドリングを追加
     function submitRequestToGAS() {
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'submitShiftRequest', staffName: document.getElementById('requestNameSelect').value, requests: requestData }) })
+      document.getElementById('loadingOverlay').style.display = 'flex';
+      fetch(GAS_URL, { 
+        method: 'POST', 
+        body: JSON.stringify({ action: 'submitShiftRequest', staffName: document.getElementById('requestNameSelect').value, requests: requestData }) 
+      })
       .then(res => res.json())
-      .then(data => { alert("提出完了"); navTo('page-home'); });
+      .then(data => {
+        alert("提出完了しました");
+        navTo('page-home');
+      })
+      .catch(err => {
+        console.error(err);
+        alert("送信に失敗しました。インターネット接続を確認して再度お試しください。");
+      })
+      .finally(() => {
+        document.getElementById('loadingOverlay').style.display = 'none';
+      });
     }
   </script>
 </body>
