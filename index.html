@@ -138,7 +138,9 @@
   </div>
 
   <script>
-// --- SPA ナビゲーション ---
+    // --- 基本設定・共通機能 ---
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec";
+
     function navTo(pageId) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById(pageId).classList.add('active');
@@ -147,13 +149,9 @@
     function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; // あなたのGASのURL
+    let staffMasterData = []; 
 
-    // ==========================================
-    // 1. 初期起動時：社員名簿から名前リストを取得
-    // ==========================================
-    let staffMasterData = []; // 取得したデータを保存するハコ
-
+    // --- ページ読み込み時 ---
     window.onload = function() {
       fetch(GAS_URL, {
         method: 'POST',
@@ -162,14 +160,12 @@
       .then(res => res.json())
       .then(data => {
         if(data.status === 'success') {
-          staffMasterData = data.data; // [{name:"Aさん", rule:"月水10:00-19:00"}, ...]
+          staffMasterData = data.data; 
           const select = document.getElementById('requestNameSelect');
           select.innerHTML = '<option value="">👤 名前を選択...</option>';
-          
           staffMasterData.forEach(staff => {
             const opt = document.createElement('option');
             opt.value = staff.name;
-            // E列に何かルールが書いてあれば「休み希望ベース」、空欄なら「出勤可能ベース」と表示
             const typeLabel = staff.rule ? "（休み希望）" : "（出勤ベース）";
             opt.innerText = `${staff.name} ${typeLabel}`;
             select.appendChild(opt);
@@ -178,17 +174,13 @@
       });
     };
 
-    // ==========================================
-    // 2. シフト確認画面（原因3の解決）
-    // ==========================================
+    // --- シフト確認 ---
     function onMonthChange() {
-      const type = document.getElementById('targetMonthSelect').value;
-      loadStaffShiftData(type);
+      loadStaffShiftData(document.getElementById('targetMonthSelect').value);
     }
 
     function loadStaffShiftData(type) {
       document.getElementById('tableContainer').innerHTML = '<div style="padding: 40px 0; color: #888;">読み込み中...</div>';
-      
       fetch(GAS_URL, {
         method: 'POST',
         body: JSON.stringify({ action: 'getStaffShiftData', target: type })
@@ -196,44 +188,34 @@
       .then(res => res.json())
       .then(data => {
         if(data.status === 'success') {
-          // 取得した2次元配列データからテーブル（表）を組み立てる
           let html = '<table>';
           data.data.forEach((row, rowIndex) => {
             html += '<tr>';
             row.forEach(cell => {
-              if (rowIndex === 0) html += `<th>${cell}</th>`; // 1行目は見出し
-              else html += `<td>${cell || ""}</td>`; // 空白なら空にする
+              if (rowIndex === 0) html += `<th>${cell}</th>`;
+              else html += `<td>${cell || ""}</td>`;
             });
             html += '</tr>';
           });
           html += '</table>';
           document.getElementById('tableContainer').innerHTML = html;
         } else {
-          document.getElementById('tableContainer').innerHTML = `<div style="color:red;">エラー: ${data.message}</div>`;
+          document.getElementById('tableContainer').innerHTML = `<div style="color:red;">データなし</div>`;
         }
-      })
-      .catch(err => {
-        document.getElementById('tableContainer').innerHTML = `<div style="color:red;">通信エラーが発生しました</div>`;
       });
     }
 
-    // ==========================================
-    // 3. シフト提出用のロジック
-    // ==========================================
+    // --- シフト提出ロジック ---
     let requestData = [];
     let editingDayIndex = -1;
-    let currentStaffRule = ""; // 選択した人のE列のルールを保持
+    let currentStaffRule = "";
 
     function startShiftRequest() {
       const selectedName = document.getElementById('requestNameSelect').value;
       if (!selectedName) { alert("名前を選択してください"); return; }
-
-      // 選択された人のデータをマスターから探し出す
       const staffInfo = staffMasterData.find(s => s.name === selectedName);
-      currentStaffRule = staffInfo ? staffInfo.rule : ""; // E列のルール文字
-      
+      currentStaffRule = staffInfo ? staffInfo.rule : "";
       document.getElementById('requestingNameDisplay').innerText = `👤 ${selectedName} さんの提出画面`;
-      
       generateSubmitCalendar();
       navTo('page-submit-calendar');
     }
@@ -242,8 +224,6 @@
       const grid = document.getElementById('submitCalendarGrid');
       grid.innerHTML = '';
       requestData = [];
-
-      // 来月の日付リストを自動生成
       const today = new Date();
       const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
       const year = nextMonth.getFullYear();
@@ -251,76 +231,40 @@
       const lastDay = new Date(year, month, 0).getDate(); 
       const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
       
-      const targetDays = [];
       for(let i = 1; i <= lastDay; i++) {
         let d = new Date(year, month - 1, i);
-        targetDays.push(`${i}日(${dayNames[d.getDay()]})`);
-      }
-
-      // カレンダーの各マスの設定
-      targetDays.forEach((dayStr, index) => {
-        let baseShift = ""; 
+        let dayStr = `${i}日(${dayNames[d.getDay()]})`;
+        let baseShift = "";
         
-        // 【簡易判定】もしルール(E列)に「10:00-19:00」のような文字があり、かつ該当の「曜日」が含まれていたら、それを初期値にする。
-        // ※ルールの書き方によって調整が必要ですが、とりあえず「月水金 10-19」みたいな書き方に対応する簡易版です。
         if (currentStaffRule) {
-          const dayChar = dayStr.match(/\((.*?)\)/)[1]; // "月" などを抽出
+          const dayChar = dayNames[d.getDay()];
           if (currentStaffRule.includes(dayChar)) {
-            // E列に書かれている時間を強引に抜き出す（例: 10:00-19:00など）
-            const timeMatch = currentStaffRule.match(/\d{1,2}:\d{2}-\d{1,2}:\d{2}|LAST/);
-            baseShift = timeMatch ? timeMatch[0] : "10:00-19:00"; 
+             const timeMatch = currentStaffRule.match(/\d{1,2}:\d{2}-\d{1,2}:\d{2}|LAST/);
+             baseShift = timeMatch ? timeMatch[0] : "10:00-19:00"; 
           }
         }
-
-        requestData.push({
-          dateStr: dayStr,
-          baseShift: baseShift, 
-          requestedShift: baseShift, 
-          isModified: false
-        });
-
+        requestData.push({ dateStr: dayStr, baseShift: baseShift, requestedShift: baseShift, isModified: false });
         const dayDiv = document.createElement('div');
         dayDiv.className = 'submit-day';
-        dayDiv.id = `req-day-${index}`;
-        dayDiv.onclick = () => openModal(index);
+        dayDiv.id = `req-day-${i - 1}`;
+        dayDiv.onclick = () => openModal(i - 1);
         grid.appendChild(dayDiv);
-      });
-
+      }
       renderSubmitGrid();
     }
-
-    // （これより下の renderSubmitGrid, openModal, closeModal, saveModalTime, setModalOff, resetModal, submitRequestToGAS は前回のコードをそのまま貼り付けてください！）
 
     function renderSubmitGrid() {
       requestData.forEach((data, index) => {
         const div = document.getElementById(`req-day-${index}`);
         let statusHtml = '<span style="color:#aaa;">未入力</span>';
-
         if (data.requestedShift === "OFF") {
-          if (data.baseShift) {
-            // 元々シフトがあったのに休む場合（休み希望）
-            statusHtml = `<span class="status-off">${data.baseShift}</span><span class="badge-off">❌休</span>`;
-          } else {
-            // 元々ない日に「休」を入れた場合（表示しなくてもいいが念のため）
-            statusHtml = `<span class="badge-off">❌休</span>`;
-          }
+          statusHtml = data.baseShift ? `<span class="status-off">${data.baseShift}</span><span class="badge-off">❌休</span>` : `<span class="badge-off">❌休</span>`;
         } else if (data.requestedShift) {
-          if (!data.baseShift) {
-            // 元々休みの日に追加する場合
-            statusHtml = `<span class="status-add">${data.requestedShift}</span> <span class="badge-off">➕追加</span>`;
-          } else if (data.baseShift !== data.requestedShift) {
-            // 時間を変更する場合
-            statusHtml = `<span class="old-time">${data.baseShift}</span><span class="status-change">${data.requestedShift}</span> <span class="badge-off">🕒変更</span>`;
-          } else {
-            // 固定シフトそのまま
-            statusHtml = `<span>${data.requestedShift}</span>`;
-          }
+          statusHtml = (!data.baseShift) ? `<span class="status-add">${data.requestedShift}</span> <span class="badge-off">➕追加</span>` : 
+                       (data.baseShift !== data.requestedShift) ? `<span class="old-time">${data.baseShift}</span><span class="status-change">${data.requestedShift}</span> <span class="badge-off">🕒変更</span>` : 
+                       `<span>${data.requestedShift}</span>`;
         }
-
-        div.innerHTML = `
-          <div class="day-label">${data.dateStr}</div>
-          <div class="shift-status">${statusHtml}</div>
-        `;
+        div.innerHTML = `<div class="day-label">${data.dateStr}</div><div class="shift-status">${statusHtml}</div>`;
       });
     }
 
@@ -329,8 +273,6 @@
       editingDayIndex = index;
       const data = requestData[index];
       document.getElementById('modalDateLabel').innerText = data.dateStr;
-      
-      // セレクトボックスの初期値設定（あれば）
       if (data.requestedShift && data.requestedShift !== "OFF") {
         const parts = data.requestedShift.split('-');
         if(parts.length === 2) {
@@ -360,47 +302,31 @@
     }
 
     function resetModal() {
-      // 初期状態（ベースシフト）に戻す
       requestData[editingDayIndex].requestedShift = requestData[editingDayIndex].baseShift;
       requestData[editingDayIndex].isModified = false;
       renderSubmitGrid();
       closeModal();
     }
 
-    // --- GASへの送信 ---
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; // WebアプリのURL
-
     function submitRequestToGAS() {
-      const staffName = document.getElementById('requestNameSelect').value.split('_')[0];
-      
       const payload = {
         action: 'submitShiftRequest',
-        staffName: staffName,
+        staffName: document.getElementById('requestNameSelect').value,
         requests: requestData.map(d => ({ date: d.dateStr, shift: d.requestedShift }))
       };
-
-      // ローディング画面を表示してGASへ送信（本番用）
       showLoading();
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      })
+      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
       .then(res => res.json())
       .then(data => {
         hideLoading();
         if(data.status === "success") {
           alert("シフト希望を提出しました！");
-          navTo('page-home'); // トップに戻る
+          navTo('page-home');
         } else {
-          alert("エラーが発生しました: " + data.message);
+          alert("エラー: " + data.message);
         }
-      })
-      .catch(err => {
-        hideLoading();
-        alert("通信エラー: " + err.message);
       });
     }
-
 
   </script>
 </body>
