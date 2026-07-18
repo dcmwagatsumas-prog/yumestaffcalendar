@@ -173,11 +173,26 @@
       requestData = [];
 
       // ※本来は翌月の日付と曜日を生成。ここではサンプルで数日分
-      const dummyDays = ['1日(月)', '2日(火)', '3日(水)', '4日(木)'];
+      // ＝＝＝ ここから入れ替え ＝＝＝
+      // 来月の日付リストを自動生成する
+      const today = new Date();
+      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      const year = nextMonth.getFullYear();
+      const month = nextMonth.getMonth() + 1;
+      const lastDay = new Date(year, month, 0).getDate(); // 来月の末日
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
       
-      dummyDays.forEach((dayStr, index) => {
-        // スタッフのタイプによって初期表示を変える
+      const targetDays = [];
+      for(let i = 1; i <= lastDay; i++) {
+        let d = new Date(year, month - 1, i);
+        targetDays.push(`${i}日(${dayNames[d.getDay()]})`);
+      }
+      // ＝＝＝ ここまで ＝＝＝
+
+      // dummyDays ではなく targetDays をループさせる
+      targetDays.forEach((dayStr, index) => {
         let baseShift = ""; 
+        // （これ以降の if (currentStaffType === 'fixed') { ... の処理はそのまま）
         if (currentStaffType === 'fixed') {
           // 固定シフトがある人の初期値（例: 月水は10-19）
           if(dayStr.includes('月') || dayStr.includes('水')) baseShift = "10:00-19:00";
@@ -282,17 +297,13 @@
     function submitRequestToGAS() {
       const staffName = document.getElementById('requestNameSelect').value.split('_')[0];
       
-      // 送信用にデータを整形（変更があったもの、または入力されたものだけ抽出など）
       const payload = {
         action: 'submitShiftRequest',
         staffName: staffName,
         requests: requestData.map(d => ({ date: d.dateStr, shift: d.requestedShift }))
       };
 
-      console.log("送信データ:", payload);
-      alert("コンソールに送信データを表示しました（ここでGASへFetchします）");
-      
-      /* 本番用のFetch処理
+      // ローディング画面を表示してGASへ送信（本番用）
       showLoading();
       fetch(GAS_URL, {
         method: 'POST',
@@ -301,10 +312,17 @@
       .then(res => res.json())
       .then(data => {
         hideLoading();
-        alert("シフト希望を提出しました！");
-        navTo('page-home');
+        if(data.status === "success") {
+          alert("シフト希望を提出しました！");
+          navTo('page-home'); // トップに戻る
+        } else {
+          alert("エラーが発生しました: " + data.message);
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        alert("通信エラー: " + err.message);
       });
-      */
     }
 
     // --- 既存のシフト確認用ダミー関数（エラー回避用） ---
