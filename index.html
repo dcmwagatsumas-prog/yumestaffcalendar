@@ -126,45 +126,44 @@
           });
           html += '</table>';
           document.getElementById('tableContainer').innerHTML = html;
-          // DOM構築後に名前リストを更新
           updateHighlightSelector();
         }
       });
     }
 
-    // 名前リストを確実に更新する関数
     function updateHighlightSelector() {
       const select = document.getElementById('highlightNameSelect');
       select.innerHTML = '<option value="">👤 自分の列を強調...</option>';
-      // ヘッダー行のみを取得（1行目）
-      const headers = document.querySelectorAll('#tableContainer tr:first-child th');
-      headers.forEach(th => {
-        const name = th.innerText.trim();
-        if(name && name !== "日付" && name !== "担当") { // 不要な見出しを除外
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.innerText = name;
-          select.appendChild(opt);
+      
+      // 2行目のtd要素を取得
+      const cells = document.querySelectorAll('#tableContainer tr:nth-child(2) td');
+      
+      // インデックス2以降（C列以降）をループ
+      cells.forEach((cell, idx) => {
+        if(idx >= 2) { 
+          const name = cell.innerText.trim();
+          if(name) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.innerText = name;
+            select.appendChild(opt);
+          }
         }
       });
     }
 
-    // 目に優しいパステルブルーのハイライト
     function applyHighlight() {
-      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { 
-        el.style.outline = ""; 
-        el.style.backgroundColor = ""; 
-      });
+      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { el.style.outline = ""; el.style.backgroundColor = ""; });
       if (!selectedHighlightName) return;
       
-      const headers = Array.from(document.querySelectorAll('#tableContainer th'));
+      const headers = Array.from(document.querySelectorAll('#tableContainer tr:nth-child(2) td'));
       const idx = headers.findIndex(h => h.innerText.trim() === selectedHighlightName);
       
       if (idx !== -1) {
         document.querySelectorAll('#tableContainer tr').forEach(tr => {
           if (tr.cells[idx]) { 
-            tr.cells[idx].style.outline = "2px solid #2196f3"; // 鮮やかな青
-            tr.cells[idx].style.backgroundColor = "#e3f2fd";   // 目に優しい薄い青
+            tr.cells[idx].style.outline = "2px solid #2196f3";
+            tr.cells[idx].style.backgroundColor = "#e3f2fd";
           }
         });
       }
@@ -185,7 +184,13 @@
       for(let i=1; i<=days; i++) {
         let d = new Date(new Date().getFullYear(), new Date().getMonth()+1, i);
         let dayStr = `${i}日(${dayNames[d.getDay()]})`;
-        let rule = (staff && staff.rule && staff.rule.includes(dayNames[d.getDay()])) ? staff.rule.match(/\d{2}:\d{2}-\d{2}:\d{2}/)?.[0] || "10:00-19:00" : "";
+        
+        // 正規表現をより柔軟に（10:00-19:00, 10:00~19:00 などに対応）
+        let rule = "";
+        if(staff && staff.rule && staff.rule.includes(dayNames[d.getDay()])) {
+            const match = staff.rule.match(/\d{1,2}:\d{2}[-〜]\d{1,2}:\d{2}/);
+            rule = match ? match[0] : "10:00-19:00";
+        }
         
         requestData.push({ dateStr: dayStr, requestedShift: rule });
         const div = document.createElement('div');
