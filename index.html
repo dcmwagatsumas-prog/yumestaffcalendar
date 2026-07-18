@@ -97,6 +97,23 @@
       document.getElementById(pageId).classList.add('active');
     }
 
+    // 複雑なルール文字列を解析するヘルパー関数
+    function parseRuleToMap(ruleStr) {
+      const ruleMap = {};
+      if (!ruleStr) return ruleMap;
+      // (曜日)→【時間】のペアを全抽出
+      const regex = /\(([^）]+)）→【([^】]+)】/g;
+      let match;
+      while ((match = regex.exec(ruleStr)) !== null) {
+        const days = match[1].split(/[、，,]/);
+        const time = match[2];
+        days.forEach(d => {
+          ruleMap[d.trim()] = time;
+        });
+      }
+      return ruleMap;
+    }
+
     window.onload = function() {
       fetch(GAS_URL + "?action=getStaffList")
       .then(res => res.json())
@@ -131,14 +148,11 @@
       });
     }
 
+    // 3行目の名前を取得するように修正
     function updateHighlightSelector() {
       const select = document.getElementById('highlightNameSelect');
       select.innerHTML = '<option value="">👤 自分の列を強調...</option>';
-      
-      // 2行目のtd要素を取得
-      const cells = document.querySelectorAll('#tableContainer tr:nth-child(2) td');
-      
-      // インデックス2以降（C列以降）をループ
+      const cells = document.querySelectorAll('#tableContainer tr:nth-child(3) td');
       cells.forEach((cell, idx) => {
         if(idx >= 2) { 
           const name = cell.innerText.trim();
@@ -155,9 +169,9 @@
     function applyHighlight() {
       document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { el.style.outline = ""; el.style.backgroundColor = ""; });
       if (!selectedHighlightName) return;
-      
-      const headers = Array.from(document.querySelectorAll('#tableContainer tr:nth-child(2) td'));
-      const idx = headers.findIndex(h => h.innerText.trim() === selectedHighlightName);
+      // 3行目から列を探す
+      const cells = Array.from(document.querySelectorAll('#tableContainer tr:nth-child(3) td'));
+      const idx = cells.findIndex(c => c.innerText.trim() === selectedHighlightName);
       
       if (idx !== -1) {
         document.querySelectorAll('#tableContainer tr').forEach(tr => {
@@ -181,23 +195,21 @@
       const days = new Date(new Date().getFullYear(), new Date().getMonth()+2, 0).getDate();
       const dayNames = ['日','月','火','水','木','金','土'];
       
+      // ルールを辞書化しておく
+      const ruleMap = parseRuleToMap(staff ? staff.rule : "");
+      
       for(let i=1; i<=days; i++) {
         let d = new Date(new Date().getFullYear(), new Date().getMonth()+1, i);
-        let dayStr = `${i}日(${dayNames[d.getDay()]})`;
+        let dayName = dayNames[d.getDay()]; // 例: "月"
         
-        // 正規表現をより柔軟に（10:00-19:00, 10:00~19:00 などに対応）
-        let rule = "";
-        if(staff && staff.rule && staff.rule.includes(dayNames[d.getDay()])) {
-            const match = staff.rule.match(/\d{1,2}:\d{2}[-〜]\d{1,2}:\d{2}/);
-            rule = match ? match[0] : "10:00-19:00";
-        }
+        let rule = ruleMap[dayName] || "";
         
-        requestData.push({ dateStr: dayStr, requestedShift: rule });
+        requestData.push({ dateStr: `${i}日(${dayName})`, requestedShift: rule });
         const div = document.createElement('div');
         div.className = 'submit-day';
         div.id = `req-day-${i-1}`;
         div.onclick = () => { 
-          document.getElementById('modalDateLabel').innerText = dayStr;
+          document.getElementById('modalDateLabel').innerText = `${i}日(${dayName})`;
           document.getElementById('timeModal').style.display = 'flex';
           window.editingIndex = i-1;
         };
