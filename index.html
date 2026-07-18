@@ -11,7 +11,6 @@
     .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; box-sizing: border-box; }
     .btn-blue { background: #007bff; color: white; }
     .btn-green { background: #28a745; color: white; }
-    .btn-gray { background: #6c757d; color: white; }
     .btn-outline { background: white; color: #333; border: 1px solid #ccc; }
     .page { display: none; }
     .page.active { display: block; }
@@ -24,7 +23,6 @@
     .submit-day { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
     .day-label { font-weight: bold; font-size: 16px; width: 80px;}
     .shift-status { flex-grow: 1; text-align: right; font-size: 15px; }
-    .badge-off { font-size: 12px; font-weight:bold; margin-left: 5px; color: #e74c3c; }
     #timeModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
     .time-selectors { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0; }
@@ -57,7 +55,7 @@
     <button class="btn btn-outline" onclick="navTo('page-home')" style="margin-top: 15px;">戻る</button>
   </div>
 
-  <!-- 提出：名前選択 -->
+  <!-- 提出 -->
   <div id="page-submit-name" class="page card">
     <h3>📝 翌月シフト希望提出</h3>
     <select id="requestNameSelect" style="width:100%; padding:15px; margin-bottom: 20px; font-weight:bold;"></select>
@@ -65,7 +63,6 @@
     <button class="btn btn-outline" onclick="navTo('page-home')">戻る</button>
   </div>
 
-  <!-- 提出：カレンダー -->
   <div id="page-submit-calendar" class="page card" style="padding: 10px;">
     <h3 id="requestMonthTitle">来月のシフト希望</h3>
     <p id="requestingNameDisplay" style="font-weight:bold; color:#007bff;"></p>
@@ -100,7 +97,6 @@
       document.getElementById(pageId).classList.add('active');
     }
 
-    // 初期化：名簿取得
     window.onload = function() {
       fetch(GAS_URL + "?action=getStaffList")
       .then(res => res.json())
@@ -118,8 +114,8 @@
       });
     };
 
-    // シフト確認とハイライト
     function loadStaffShiftData(type) {
+      document.getElementById('tableContainer').innerHTML = '読み込み中...';
       fetch(GAS_URL + `?action=getStaffShiftData&target=${type}`)
       .then(res => res.json())
       .then(data => {
@@ -130,38 +126,53 @@
           });
           html += '</table>';
           document.getElementById('tableContainer').innerHTML = html;
+          // DOM構築後に名前リストを更新
           updateHighlightSelector();
         }
       });
     }
 
+    // 名前リストを確実に更新する関数
     function updateHighlightSelector() {
       const select = document.getElementById('highlightNameSelect');
       select.innerHTML = '<option value="">👤 自分の列を強調...</option>';
-      document.querySelectorAll('#tableContainer th').forEach(th => {
-        if(th.innerText) {
+      // ヘッダー行のみを取得（1行目）
+      const headers = document.querySelectorAll('#tableContainer tr:first-child th');
+      headers.forEach(th => {
+        const name = th.innerText.trim();
+        if(name && name !== "日付" && name !== "担当") { // 不要な見出しを除外
           const opt = document.createElement('option');
-          opt.value = opt.innerText = th.innerText;
+          opt.value = name;
+          opt.innerText = name;
           select.appendChild(opt);
         }
       });
     }
 
+    // 目に優しいパステルブルーのハイライト
     function applyHighlight() {
-      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { el.style.outline = ""; el.style.backgroundColor = ""; });
+      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { 
+        el.style.outline = ""; 
+        el.style.backgroundColor = ""; 
+      });
       if (!selectedHighlightName) return;
+      
       const headers = Array.from(document.querySelectorAll('#tableContainer th'));
-      const idx = headers.findIndex(h => h.innerText === selectedHighlightName);
+      const idx = headers.findIndex(h => h.innerText.trim() === selectedHighlightName);
+      
       if (idx !== -1) {
         document.querySelectorAll('#tableContainer tr').forEach(tr => {
-          if (tr.cells[idx]) { tr.cells[idx].style.outline = "2px solid #ff9900"; tr.cells[idx].style.backgroundColor = "#fff3cd"; }
+          if (tr.cells[idx]) { 
+            tr.cells[idx].style.outline = "2px solid #2196f3"; // 鮮やかな青
+            tr.cells[idx].style.backgroundColor = "#e3f2fd";   // 目に優しい薄い青
+          }
         });
       }
     }
 
-    // 提出ロジック
     function startShiftRequest() {
       const name = document.getElementById('requestNameSelect').value;
+      if(!name) { alert("名前を選択してください"); return; }
       const staff = staffMasterData.find(s => s.name === name);
       document.getElementById('requestingNameDisplay').innerText = `👤 ${name} さんのシフト希望`;
       
@@ -176,7 +187,7 @@
         let dayStr = `${i}日(${dayNames[d.getDay()]})`;
         let rule = (staff && staff.rule && staff.rule.includes(dayNames[d.getDay()])) ? staff.rule.match(/\d{2}:\d{2}-\d{2}:\d{2}/)?.[0] || "10:00-19:00" : "";
         
-        requestData.push({ dateStr: dayStr, requestedShift: rule }); // ruleがあれば初期値として代入
+        requestData.push({ dateStr: dayStr, requestedShift: rule });
         const div = document.createElement('div');
         div.className = 'submit-day';
         div.id = `req-day-${i-1}`;
