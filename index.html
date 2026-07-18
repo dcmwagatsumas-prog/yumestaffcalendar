@@ -101,14 +101,18 @@
     function parseRuleToMap(ruleStr) {
       const ruleMap = {};
       if (!ruleStr) return ruleMap;
-      // (曜日)→【時間】のペアを全抽出
-      const regex = /\(([^）]+)）→【([^】]+)】/g;
+      
+      // 画像の形式に対応：全角・半角の括弧と→【】を強力にマッチング
+      const regex = /[（\(]([^）\)]+)[\)）]→【([^】]+)】/g;
       let match;
       while ((match = regex.exec(ruleStr)) !== null) {
+        // カンマ、読点、全角カンマで分割
         const days = match[1].split(/[、，,]/);
         const time = match[2];
         days.forEach(d => {
-          ruleMap[d.trim()] = time;
+          // 曜日名だけの文字列にする（トリムして記号除去）
+          const dayName = d.trim().replace(/[\（\）\(\)]/g, "");
+          if(dayName) ruleMap[dayName] = time;
         });
       }
       return ruleMap;
@@ -169,7 +173,7 @@
     function applyHighlight() {
       document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { el.style.outline = ""; el.style.backgroundColor = ""; });
       if (!selectedHighlightName) return;
-      // 3行目から列を探す
+      // 3行目のtdを基準に検索
       const cells = Array.from(document.querySelectorAll('#tableContainer tr:nth-child(3) td'));
       const idx = cells.findIndex(c => c.innerText.trim() === selectedHighlightName);
       
@@ -202,6 +206,7 @@
         let d = new Date(new Date().getFullYear(), new Date().getMonth()+1, i);
         let dayName = dayNames[d.getDay()]; // 例: "月"
         
+        // 辞書から該当する時間を取得
         let rule = ruleMap[dayName] || "";
         
         requestData.push({ dateStr: `${i}日(${dayName})`, requestedShift: rule });
