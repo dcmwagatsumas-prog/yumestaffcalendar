@@ -22,14 +22,9 @@
     td:first-child { position: sticky; left: 0; background: #f8f9fa; font-weight: bold; z-index: 8; }
     .submit-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 15px; text-align: left;}
     .submit-day { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-    .submit-day:active { background: #f8f9fa; }
-    .day-label { font-weight: bold; font-size: 16px; width: 60px;}
+    .day-label { font-weight: bold; font-size: 16px; width: 80px;}
     .shift-status { flex-grow: 1; text-align: right; font-size: 15px; }
-    .status-off { color: #888; text-decoration: line-through; }
-    .badge-off { font-size: 12px; font-weight:bold; margin-left: 5px; }
-    .status-add { font-weight: bold; border-bottom: 1px dashed #333; }
-    .status-change { font-weight: bold; }
-    .old-time { font-size: 11px; text-decoration: line-through; color: #777; display: block; line-height: 1; margin-bottom: 3px;}
+    .badge-off { font-size: 12px; font-weight:bold; margin-left: 5px; color: #e74c3c; }
     #timeModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
     .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
     .time-selectors { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0; }
@@ -39,189 +34,181 @@
 </head>
 <body>
 
-  <div id="loadingOverlay">
-    <div style="text-align:center;">
-      <p style="font-size:24px; margin:0;">🚗</p><p>通信中...</p>
-    </div>
-  </div>
+  <div id="loadingOverlay"><p>通信中...</p></div>
 
+  <!-- ホーム -->
   <div id="page-home" class="page active card">
-    <h2>🏠 夢Rikyu<br>スタッフシフトポータル</h2>
+    <h2>🏠 スタッフシフトポータル</h2>
     <button class="btn btn-blue" onclick="navTo('page-view'); loadStaffShiftData('latest');">👀 シフト確認</button>
     <button class="btn btn-green" onclick="navTo('page-submit-name')">📝 来月のシフト提出</button>
   </div>
 
+  <!-- シフト確認 -->
   <div id="page-view" class="page card">
     <h3>👤 シフト確認</h3>
+    <select id="highlightNameSelect" onchange="selectedHighlightName = this.value; applyHighlight();" style="width:100%; padding:10px; margin-bottom:10px;">
+      <option value="">👤 自分の列を強調する...</option>
+    </select>
     <select id="targetMonthSelect" onchange="onMonthChange()" style="width:100%; padding:10px; margin-bottom:10px;">
       <option value="latest">📅 最新（今月）のシフト</option>
       <option value="prev">📅 前月のシフト</option>
     </select>
-    <div class="table-container" id="tableContainer">
-      <div style="padding: 40px 0; color: #888;">読み込み中...</div>
-    </div>
+    <div class="table-container" id="tableContainer"></div>
     <button class="btn btn-outline" onclick="navTo('page-home')" style="margin-top: 15px;">戻る</button>
   </div>
 
+  <!-- 提出：名前選択 -->
   <div id="page-submit-name" class="page card">
     <h3>📝 翌月シフト希望提出</h3>
-    <select id="requestNameSelect" style="width:100%; padding:15px; margin-bottom: 20px; font-weight:bold;">
-      <option value="">👤 名前を選択...</option>
-    </select>
+    <select id="requestNameSelect" style="width:100%; padding:15px; margin-bottom: 20px; font-weight:bold;"></select>
     <button class="btn btn-green" onclick="startShiftRequest()">次へ</button>
     <button class="btn btn-outline" onclick="navTo('page-home')">戻る</button>
   </div>
 
+  <!-- 提出：カレンダー -->
   <div id="page-submit-calendar" class="page card" style="padding: 10px;">
-    <h3 id="requestMonthTitle" style="margin-bottom: 5px;">来月のシフト希望</h3>
-    <p id="requestingNameDisplay" style="font-size:14px; color:#007bff; margin-top:0; font-weight:bold;"></p>
+    <h3 id="requestMonthTitle">来月のシフト希望</h3>
+    <p id="requestingNameDisplay" style="font-weight:bold; color:#007bff;"></p>
     <div id="submitCalendarGrid" class="submit-grid"></div>
-    <button class="btn btn-blue" onclick="submitRequestToGAS()" style="margin-top: 20px;">📤 この内容で提出する</button>
+    <button class="btn btn-blue" onclick="submitRequestToGAS()" style="margin-top: 20px;">📤 提出する</button>
     <button class="btn btn-outline" onclick="navTo('page-submit-name')">戻る</button>
   </div>
 
+  <!-- モーダル -->
   <div id="timeModal">
     <div class="modal-content">
-      <h3 id="modalDateLabel">10月1日 (火)</h3>
+      <h3 id="modalDateLabel"></h3>
       <div class="time-selectors">
         <select id="modalStart"><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="17:00">17:00</option></select>
         <span>〜</span>
         <select id="modalEnd"><option value="15:00">15:00</option><option value="19:00">19:00</option><option value="LAST">LAST</option></select>
       </div>
-      <button class="btn btn-blue" onclick="saveModalTime()">💾 決定する</button>
-      <button class="btn" style="background:#e74c3c; color:white;" onclick="setModalOff()">❌ 休み希望にする</button>
+      <button class="btn btn-blue" onclick="saveModalTime()">💾 決定</button>
+      <button class="btn" style="background:#e74c3c; color:white;" onclick="setModalOff()">❌ 休み</button>
       <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
     </div>
   </div>
 
   <script>
     const GAS_URL = "https://script.google.com/macros/s/AKfycbzIhyaA606DXO8Sn6e9qxSZHDpPzf3XWF9n-2XGSrZsnRAMlem7U8Irq7g3FIFn7yo/exec";
+    let staffMasterData = []; 
+    let requestData = [];
+    let selectedHighlightName = "";
 
     function navTo(pageId) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.getElementById(pageId).classList.add('active');
     }
-    function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
-    function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
-    let staffMasterData = []; 
-
+    // 初期化：名簿取得
     window.onload = function() {
-      // データの取得はGETに変更（これでCORS問題が消えます）
       fetch(GAS_URL + "?action=getStaffList")
       .then(res => res.json())
       .then(data => {
         if(data.status === 'success') {
-          staffMasterData = data.data; 
+          staffMasterData = data.data;
           const select = document.getElementById('requestNameSelect');
-          select.innerHTML = '<option value="">👤 名前を選択...</option>';
-          staffMasterData.forEach(staff => {
+          staffMasterData.forEach(s => {
             const opt = document.createElement('option');
-            opt.value = staff.name;
-            opt.innerText = `${staff.name} ${staff.rule ? "（休み希望）" : "（出勤ベース）"}`;
+            opt.value = s.name;
+            opt.innerText = `${s.name} ${s.rule ? "(固定有)" : ""}`;
             select.appendChild(opt);
           });
         }
       });
     };
 
-    function onMonthChange() {
-      loadStaffShiftData(document.getElementById('targetMonthSelect').value);
-    }
-
+    // シフト確認とハイライト
     function loadStaffShiftData(type) {
-      document.getElementById('tableContainer').innerHTML = '<div style="padding: 40px 0; color: #888;">読み込み中...</div>';
-      // データの取得はGETに変更
       fetch(GAS_URL + `?action=getStaffShiftData&target=${type}`)
       .then(res => res.json())
       .then(data => {
         if(data.status === 'success') {
           let html = '<table>';
-          data.data.forEach((row, rowIndex) => {
-            html += '<tr>';
-            row.forEach(cell => {
-              if (rowIndex === 0) html += `<th>${cell}</th>`;
-              else html += `<td>${cell || ""}</td>`;
-            });
-            html += '</tr>';
+          data.data.forEach((row, i) => {
+            html += '<tr>' + row.map(c => (i===0 ? `<th>${c}</th>` : `<td>${c||""}</td>`)).join('') + '</tr>';
           });
           html += '</table>';
           document.getElementById('tableContainer').innerHTML = html;
+          updateHighlightSelector();
         }
       });
     }
 
-    // 提出だけはPOSTのまま（データ送信のため）
-    function submitRequestToGAS() {
-      const payload = { action: 'submitShiftRequest', staffName: document.getElementById('requestNameSelect').value, requests: requestData.map(d => ({ date: d.dateStr, shift: d.requestedShift })) };
-      showLoading();
-      fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) })
-      .then(res => res.json())
-      .then(data => {
-        hideLoading();
-        if(data.status === "success") { alert("提出しました！"); navTo('page-home'); }
-        else { alert("エラー: " + data.message); }
+    function updateHighlightSelector() {
+      const select = document.getElementById('highlightNameSelect');
+      select.innerHTML = '<option value="">👤 自分の列を強調...</option>';
+      document.querySelectorAll('#tableContainer th').forEach(th => {
+        if(th.innerText) {
+          const opt = document.createElement('option');
+          opt.value = opt.innerText = th.innerText;
+          select.appendChild(opt);
+        }
       });
     }
 
-    // (以下、カレンダー生成やモーダルロジックは変更なしのため省略して記載してください)
-    let requestData = [];
-    let editingDayIndex = -1;
-    let currentStaffRule = "";
-
-    function startShiftRequest() {
-      const selectedName = document.getElementById('requestNameSelect').value;
-      if (!selectedName) { alert("名前を選択してください"); return; }
-      const staffInfo = staffMasterData.find(s => s.name === selectedName);
-      currentStaffRule = staffInfo ? staffInfo.rule : "";
-      document.getElementById('requestingNameDisplay').innerText = `👤 ${selectedName} さんの提出画面`;
-      generateSubmitCalendar();
-      navTo('page-submit-calendar');
+    function applyHighlight() {
+      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => { el.style.outline = ""; el.style.backgroundColor = ""; });
+      if (!selectedHighlightName) return;
+      const headers = Array.from(document.querySelectorAll('#tableContainer th'));
+      const idx = headers.findIndex(h => h.innerText === selectedHighlightName);
+      if (idx !== -1) {
+        document.querySelectorAll('#tableContainer tr').forEach(tr => {
+          if (tr.cells[idx]) { tr.cells[idx].style.outline = "2px solid #ff9900"; tr.cells[idx].style.backgroundColor = "#fff3cd"; }
+        });
+      }
     }
 
-    function generateSubmitCalendar() {
+    // 提出ロジック
+    function startShiftRequest() {
+      const name = document.getElementById('requestNameSelect').value;
+      const staff = staffMasterData.find(s => s.name === name);
+      document.getElementById('requestingNameDisplay').innerText = `👤 ${name} さんのシフト希望`;
+      
       const grid = document.getElementById('submitCalendarGrid');
       grid.innerHTML = '';
       requestData = [];
-      const today = new Date();
-      const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-      const year = nextMonth.getFullYear();
-      const month = nextMonth.getMonth() + 1;
-      const lastDay = new Date(year, month, 0).getDate(); 
-      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-      for(let i = 1; i <= lastDay; i++) {
-        let d = new Date(year, month - 1, i);
+      const days = new Date(new Date().getFullYear(), new Date().getMonth()+2, 0).getDate();
+      const dayNames = ['日','月','火','水','木','金','土'];
+      
+      for(let i=1; i<=days; i++) {
+        let d = new Date(new Date().getFullYear(), new Date().getMonth()+1, i);
         let dayStr = `${i}日(${dayNames[d.getDay()]})`;
-        requestData.push({ dateStr: dayStr, requestedShift: "", isModified: false });
-        const dayDiv = document.createElement('div');
-        dayDiv.className = 'submit-day';
-        dayDiv.id = `req-day-${i - 1}`;
-        dayDiv.onclick = () => openModal(i - 1);
-        grid.appendChild(dayDiv);
+        let rule = (staff && staff.rule && staff.rule.includes(dayNames[d.getDay()])) ? staff.rule.match(/\d{2}:\d{2}-\d{2}:\d{2}/)?.[0] || "10:00-19:00" : "";
+        
+        requestData.push({ dateStr: dayStr, requestedShift: rule }); // ruleがあれば初期値として代入
+        const div = document.createElement('div');
+        div.className = 'submit-day';
+        div.id = `req-day-${i-1}`;
+        div.onclick = () => { 
+          document.getElementById('modalDateLabel').innerText = dayStr;
+          document.getElementById('timeModal').style.display = 'flex';
+          window.editingIndex = i-1;
+        };
+        grid.appendChild(div);
       }
-      renderSubmitGrid();
+      renderGrid();
+      navTo('page-submit-calendar');
     }
 
-    function renderSubmitGrid() {
-      requestData.forEach((data, index) => {
-        const div = document.getElementById(`req-day-${index}`);
-        div.innerHTML = `<div class="day-label">${data.dateStr}</div><div class="shift-status">${data.requestedShift || "未選択"}</div>`;
+    function renderGrid() {
+      requestData.forEach((d, i) => {
+        document.getElementById(`req-day-${i}`).innerHTML = `<div class="day-label">${d.dateStr}</div><div class="shift-status">${d.requestedShift || "---"}</div>`;
       });
     }
 
-    function openModal(index) {
-      editingDayIndex = index;
-      document.getElementById('modalDateLabel').innerText = requestData[index].dateStr;
-      document.getElementById('timeModal').style.display = 'flex';
-    }
-    function closeModal() { document.getElementById('timeModal').style.display = 'none'; }
     function saveModalTime() {
-      requestData[editingDayIndex].requestedShift = `${document.getElementById('modalStart').value}-${document.getElementById('modalEnd').value}`;
-      renderSubmitGrid(); closeModal();
+      requestData[window.editingIndex].requestedShift = `${document.getElementById('modalStart').value}-${document.getElementById('modalEnd').value}`;
+      renderGrid(); closeModal();
     }
-    function setModalOff() {
-      requestData[editingDayIndex].requestedShift = "OFF";
-      renderSubmitGrid(); closeModal();
+    function setModalOff() { requestData[window.editingIndex].requestedShift = "OFF"; renderGrid(); closeModal(); }
+    function closeModal() { document.getElementById('timeModal').style.display = 'none'; }
+    function onMonthChange() { loadStaffShiftData(document.getElementById('targetMonthSelect').value); }
+    
+    function submitRequestToGAS() {
+      fetch(GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'submitShiftRequest', staffName: document.getElementById('requestNameSelect').value, requests: requestData }) })
+      .then(res => res.json())
+      .then(data => { alert("提出完了"); navTo('page-home'); });
     }
   </script>
 </body>
