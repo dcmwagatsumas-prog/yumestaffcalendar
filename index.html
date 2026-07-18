@@ -102,7 +102,6 @@
       document.getElementById(pageId).classList.add('active');
     }
 
-    // 複雑なルール文字列を解析するヘルパー関数
     function parseRuleToMap(ruleStr) {
       const ruleMap = {};
       if (!ruleStr) return ruleMap;
@@ -110,7 +109,6 @@
       let match;
       while ((match = regex.exec(ruleStr)) !== null) {
         const days = match[1].split(/[、，,]/);
-        // 【修正】「〜」や「~」を「-」に統一して保存
         const time = match[2].replace(/[～~]/g, '-');
         days.forEach(d => {
           const dayName = d.trim().replace(/[\（\）\(\)]/g, "");
@@ -209,18 +207,22 @@
         const div = document.createElement('div');
         div.className = 'submit-day';
         div.id = `req-day-${i-1}`;
-        // 【修正】タップ時に現在設定されている時間を反映させる
         div.onclick = () => { 
           document.getElementById('modalDateLabel').innerText = `${i}日(${dayName})`;
           
-          // モーダルの初期値を現在の設定値に合わせる
           const currentShift = requestData[i-1].requestedShift;
-          if (currentShift && currentShift.includes('-')) {
-            const [start, end] = currentShift.split('-');
-            document.getElementById('modalStart').value = start;
-            document.getElementById('modalEnd').value = end;
+          // 【修正】単独時間（12:00など）の場合の処理を追加
+          if (currentShift && currentShift !== "OFF") {
+            if (currentShift.includes('-')) {
+                const [start, end] = currentShift.split('-');
+                document.getElementById('modalStart').value = start;
+                document.getElementById('modalEnd').value = end;
+            } else {
+                // 12:00のような単独表記の場合
+                document.getElementById('modalStart').value = currentShift; 
+                document.getElementById('modalEnd').value = "LAST"; // デフォルトでLASTなどをセット
+            }
           } else {
-            // 設定がない場合はデフォルト
             document.getElementById('modalStart').value = "10:00";
             document.getElementById('modalEnd').value = "19:00";
           }
