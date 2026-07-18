@@ -1,251 +1,315 @@
-<!-- === ファイル名: index.html (スタッフ確認ポータル・自己診断セーフティ版) === -->
-
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-  <meta name="robots" content="noindex, nofollow">
-  <title>スタッフシフト確認ポータル</title>
+  <title>夢Rikyu スタッフシフトポータル</title>
   <style>
     body { font-family: sans-serif; background: #f0f2f5; margin: 0; padding: 15px; color: #333; }
     .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; text-align: center; margin-bottom: 15px; }
-    h3 { margin-top: 0; color: #2c3e50; font-size: 18px; margin-bottom: 5px; }
-    p.desc { font-size: 12px; color: #666; margin: 0 0 15px 0; }
+    h2, h3 { margin-top: 0; color: #2c3e50; }
     
-    .select-group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+    /* ボタンデザイン */
+    .btn { display: block; width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; box-sizing: border-box; }
+    .btn-blue { background: #007bff; color: white; }
+    .btn-green { background: #28a745; color: white; }
+    .btn-gray { background: #6c757d; color: white; }
+    .btn-outline { background: white; color: #333; border: 1px solid #ccc; }
     
-    select { 
-      padding: 14px; 
-      font-size: 15px; 
-      border-radius: 8px; 
-      border: 1px solid #ccc; 
-      width: 100%; 
-      box-sizing: border-box; 
-      text-align: center; 
-      font-weight: bold;
-      background-color: #fff;
-    }
-    
-    select.highlight-select {
-      border: 2px solid #e67e22;
-      color: #e67e22;
-      background-color: #fffbf0;
-    }
+    /* ページ切り替え用 */
+    .page { display: none; }
+    .page.active { display: block; }
 
-    .table-container { overflow: auto; max-height: 70svh; border: 1px solid #ddd; border-radius: 8px; -webkit-overflow-scrolling: touch; }
+    /* シフト確認用テーブル（元のコードのまま） */
+    .table-container { overflow: auto; max-height: 70svh; border: 1px solid #ddd; border-radius: 8px; }
     table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; }
     th, td { border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; padding: 12px 10px; text-align: center; white-space: nowrap; }
     th { background: #007bff; color: white; position: sticky; top: 0; z-index: 10; }
-    td:first-child { position: sticky; left: 0; background: #f8f9fa; font-weight: bold; z-index: 8; border-right: 2px solid #bbb; }
-    th:first-child { position: sticky; top: 0; left: 0; background: #0056b3; z-index: 12; border-right: 2px solid #bbb; }
-
-    td.has-shift {
-      background-color: #e8f5e9 !important;
-      color: #27ae60;
-      font-weight: bold;
-    }
+    td:first-child { position: sticky; left: 0; background: #f8f9fa; font-weight: bold; z-index: 8; }
     
-    .monday-row {
-      background-color: #f2f2f2 !important;
-    }
-    .monday-row td {
-      color: #aaa;
-    }
+    /* 提出用カレンダーグリッド */
+    .submit-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 15px; text-align: left;}
+    .submit-day { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .submit-day:active { background: #f8f9fa; }
+    .day-label { font-weight: bold; font-size: 16px; width: 60px;}
+    .shift-status { flex-grow: 1; text-align: right; font-size: 15px; }
 
-    #loadingOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+    /* シフトの状態表示（色に頼らない） */
+    .status-off { color: #888; text-decoration: line-through; }
+    .badge-off { font-size: 12px; font-weight:bold; margin-left: 5px; }
+    .status-add { font-weight: bold; border-bottom: 1px dashed #333; }
+    .status-change { font-weight: bold; }
+    .old-time { font-size: 11px; text-decoration: line-through; color: #777; display: block; line-height: 1; margin-bottom: 3px;}
+
+    /* モーダル */
+    #timeModal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 20px; border-radius: 12px; width: 90%; max-width: 400px; text-align: center; }
+    .time-selectors { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 20px 0; }
+    select { padding: 10px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; }
+
+    #loadingOverlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 9999; align-items: center; justify-content: center; font-weight: bold; }
   </style>
 </head>
 <body>
 
-  <!-- 💡 白いフリーズを防ぐため、「読み込み中」の中にエラーが長引いた時のための説明を付けました -->
+  <!-- ローディング -->
   <div id="loadingOverlay">
     <div style="text-align:center;">
-      <p style="font-size:24px; margin:0;">🚗</p>
-      <p style="margin:10px 0 0 0; font-size:16px;">ポータルと接続中...</p>
-      <small style="color:#888; font-size:11px; display:block; margin-top:5px;">※10秒以上かかる場合は自動でタイムアウト表示になります。</small>
+      <p style="font-size:24px; margin:0;">🚗</p><p>通信中...</p>
     </div>
   </div>
 
-  <div class="card">
-    <h3>👤 スタッフシフト確認ポータル</h3>
-    <p class="desc">自分の名前を選択すると、シフト表の中で出勤列が自動的にハイライトされます。</p>
-    
-    <div class="select-group">
-      <select id="targetMonthSelect" onchange="onMonthChange()">
-        <option value="latest">📅 最新（今月）のシフトを表示</option>
-        <option value="prev">📅 前月のシフトを表示</option>
-      </select>
-      
-      <select id="highlightSelect" class="highlight-select" onchange="onHighlightNameChange()">
-        <option value="">👤 自分の名前を選択して強調表示...</option>
-      </select>
-    </div>
+  <!-- ページ1: トップメニュー -->
+  <div id="page-home" class="page active card">
+    <h2>🏠 夢Rikyu<br>スタッフシフトポータル</h2>
+    <p style="color: #666; font-size: 14px;">メニューを選択してください</p>
+    <button class="btn btn-blue" onclick="navTo('page-view'); loadStaffShiftData('latest');">👀 シフト確認</button>
+    <button class="btn btn-green" onclick="navTo('page-submit-name')">📝 来月のシフト提出</button>
+  </div>
 
-    <!-- カレンダー表示部 -->
+  <!-- ページ2A: シフト確認（既存のもの） -->
+  <div id="page-view" class="page card">
+    <h3>👤 シフト確認</h3>
+    <select id="targetMonthSelect" onchange="onMonthChange()" style="width:100%; padding:10px; margin-bottom:10px;">
+      <option value="latest">📅 最新（今月）のシフト</option>
+      <option value="prev">📅 前月のシフト</option>
+    </select>
     <div class="table-container" id="tableContainer">
-      <div style="padding: 40px 0; color: #888; font-weight: bold;">カレンダーを読み込み中...</div>
+      <div style="padding: 40px 0; color: #888;">読み込み中...</div>
+    </div>
+    <button class="btn btn-outline" onclick="navTo('page-home')" style="margin-top: 15px;">戻る</button>
+  </div>
+
+  <!-- ページ2B-1: シフト提出（名前選択） -->
+  <div id="page-submit-name" class="page card">
+    <h3>📝 翌月シフト希望提出</h3>
+    <p style="font-size:13px; color:#666;">あなたの名前を選択してください</p>
+    
+    <select id="requestNameSelect" style="width:100%; padding:15px; margin-bottom: 20px; font-weight:bold;">
+      <option value="">👤 名前を選択...</option>
+      <!-- GASから取得するか、HTMLに直接書く -->
+      <option value="Aさん_fixed">Aさん（休み希望ベース）</option>
+      <option value="Bさん_free">Bさん（出勤可能ベース）</option>
+    </select>
+
+    <button class="btn btn-green" onclick="startShiftRequest()">次へ（カレンダーへ）</button>
+    <button class="btn btn-outline" onclick="navTo('page-home')">戻る</button>
+  </div>
+
+  <!-- ページ2B-2: シフト提出（カレンダー入力） -->
+  <div id="page-submit-calendar" class="page card" style="padding: 10px;">
+    <h3 id="requestMonthTitle" style="margin-bottom: 5px;">来月のシフト希望</h3>
+    <p id="requestingNameDisplay" style="font-size:14px; color:#007bff; margin-top:0; font-weight:bold;"></p>
+    
+    <div id="submitCalendarGrid" class="submit-grid">
+      <!-- ここにJSで日付リストが生成されます -->
+    </div>
+    
+    <button class="btn btn-blue" onclick="submitRequestToGAS()" style="margin-top: 20px;">📤 この内容で提出する</button>
+    <button class="btn btn-outline" onclick="navTo('page-submit-name')">戻る</button>
+  </div>
+
+  <!-- モーダル: 時間選択 -->
+  <div id="timeModal">
+    <div class="modal-content">
+      <h3 id="modalDateLabel">10月1日 (火)</h3>
+      <p style="font-size: 13px; color: #666;">出勤希望時間を入力、または休みを選択してください。</p>
+      
+      <div class="time-selectors">
+        <select id="modalStart">
+          <option value="10:00">10:00</option>
+          <option value="11:00">11:00</option>
+          <option value="12:00">12:00</option>
+          <option value="17:00">17:00</option>
+        </select>
+        <span>〜</span>
+        <select id="modalEnd">
+          <option value="15:00">15:00</option>
+          <option value="19:00">19:00</option>
+          <option value="LAST">LAST</option>
+        </select>
+      </div>
+
+      <button class="btn btn-blue" onclick="saveModalTime()">💾 決定する</button>
+      <button class="btn" style="background:#e74c3c; color:white;" onclick="setModalOff()">❌ 休み希望にする</button>
+      <button class="btn btn-gray" onclick="resetModal()">🔄 元に戻す（リセット）</button>
+      <button class="btn btn-outline" onclick="closeModal()">キャンセル</button>
     </div>
   </div>
 
   <script>
-    // 💡 運用中（またはテスト中）の、正しいGASウェブアプリURLをここに設定してください
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; 
-
-    function callApi(action, params, onSuccess, onFailure) {
-      console.log("API送信開始:", action, params);
-      fetch(GAS_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: action, ...params })
-      })
-      .then(response => {
-        console.log("レスポンス受信:", response.status);
-        return response.json();
-      })
-      .then(res => {
-        console.log("データ解析完了:", res);
-        if (res.status === "success") {
-          if (onSuccess) onSuccess(res.data);
-        } else {
-          if (onFailure) onFailure(new Error(res.message));
-        }
-      })
-      .catch(err => {
-        console.error("通信エラー:", err);
-        if (onFailure) onFailure(err);
-      });
+    // --- SPA ナビゲーション ---
+    function navTo(pageId) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.getElementById(pageId).classList.add('active');
     }
 
-    // 💡 タイムアウト付きローディング表示（真っ白で固まるのを防ぎます）
-    function showLoading() { 
-      document.getElementById('loadingOverlay').style.display = 'flex'; 
-      
-      // ⏱️ 10秒待っても通信が終わらない場合は、強制的に画面を開放してエラーを出します
-      setTimeout(() => {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay.style.display === 'flex') {
-          hideLoading();
-          document.getElementById('tableContainer').innerHTML = `
-            <div style="color:#e74c3c; font-weight:bold; padding:30px; background:#fff5f5; border-radius:8px; border:1px solid #ffcdd2;">
-              ⏱️ 通信接続タイムアウト (CORS制限またはURL不一致)<br><br>
-              <span style="font-weight:normal; font-size:13px; color:#555; text-align:left; display:block; line-height:1.5;">
-                ・HTMLの390行目付近に書いてある <strong>GAS_URL</strong> が、今回新しくデプロイした「テスト用GAS」のURLと完全に合致しているか確認してください。<br>
-                ・GAS（Webアプリ）のデプロイ設定において、アクセスできるユーザーが <strong>「全員（Anyone）」</strong> になっているか確認してください。
-              </span>
-            </div>`;
-        }
-      }, 10000);
-    }
-    
+    function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
     function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
 
-    let currentData = null;
-    let selectedHighlightName = "";
+    // --- シフト提出用ロジック ---
+    let currentStaffType = 'free'; // 'fixed' (休み希望型) or 'free' (出勤可能型)
+    let requestData = []; // 日付ごとの入力データ
+    let editingDayIndex = -1;
 
-    window.onload = function() {
-      loadStaffShiftData("latest");
-    };
+    function startShiftRequest() {
+      const select = document.getElementById('requestNameSelect');
+      const val = select.value;
+      if (!val) { alert("名前を選択してください"); return; }
 
-    function onMonthChange() {
-      const target = document.getElementById('targetMonthSelect').value;
-      loadStaffShiftData(target);
-    }
-
-    function loadStaffShiftData(target) {
-      showLoading();
-      callApi("getStaffShiftData", { target: target },
-        function(data) {
-          hideLoading();
-          currentData = data;
-          renderTable(data);
-        },
-        function(err) {
-          hideLoading();
-          document.getElementById('tableContainer').innerHTML = `<div style="color:red; font-weight:bold; padding:20px;">シフトの取得に失敗しました。<br>${err.message}</div>`;
-        }
-      );
-    }
-
-    function renderTable(data) {
-      const highlightSelect = document.getElementById('highlightSelect');
-      let selectHtml = `<option value="">👤 自分の名前を選択して強調表示...</option>`;
-      data.names.forEach(name => {
-        selectHtml += `<option value="${name}" ${selectedHighlightName === name ? "selected" : ""}>${name}</option>`;
-      });
-      highlightSelect.innerHTML = selectHtml;
-
-      let html = '<table><thead><tr><th>日付</th>';
-      for (let c = 0; c < data.names.length; c++) {
-        html += `<th>
-          <div class="staff-name-header" style="font-weight:bold; font-size:15px;">${data.names[c]}</div>
-          <div style="font-size:11px; font-weight:normal; color:#e0f7fa; margin-top:2px;">${data.roles[c] || ""}</div>
-        </th>`;
-      }
-      html += '</tr></thead><tbody>';
+      // 名前によってタイプを判定（実際はGASから取得したマスタデータに持たせると良いです）
+      currentStaffType = val.includes('fixed') ? 'fixed' : 'free';
+      const staffName = val.split('_')[0]; 
       
-      for (let r = 0; r < data.dates.length; r++) {
-        const dateStr = data.dates[r].toString();
-        const weekStr = data.weekdays[r].toString();
-        
-        const rowClass = weekStr.includes('月') ? "monday-row" : "";
-        
-        html += `<tr class="${rowClass}"><td>${dateStr}日<br><small style="color:#666;">(${weekStr})</small></td>`;
-        for (let c = 0; c < data.names.length; c++) {
-          const val = data.shiftData[r][c] || "";
-          const tdClass = val ? "has-shift" : "";
-          html += `<td class="${tdClass}">${val}</td>`;
+      document.getElementById('requestingNameDisplay').innerText = `👤 ${staffName} さんの提出画面`;
+      
+      generateSubmitCalendar();
+      navTo('page-submit-calendar');
+    }
+
+    function generateSubmitCalendar() {
+      const grid = document.getElementById('submitCalendarGrid');
+      grid.innerHTML = '';
+      requestData = [];
+
+      // ※本来は翌月の日付と曜日を生成。ここではサンプルで数日分
+      const dummyDays = ['1日(月)', '2日(火)', '3日(水)', '4日(木)'];
+      
+      dummyDays.forEach((dayStr, index) => {
+        // スタッフのタイプによって初期表示を変える
+        let baseShift = ""; 
+        if (currentStaffType === 'fixed') {
+          // 固定シフトがある人の初期値（例: 月水は10-19）
+          if(dayStr.includes('月') || dayStr.includes('水')) baseShift = "10:00-19:00";
         }
-        html += '</tr>';
+
+        requestData.push({
+          dateStr: dayStr,
+          baseShift: baseShift, // 元々の固定シフト
+          requestedShift: baseShift, // 提出するシフト（初期値はbaseと同じ）
+          isModified: false // 変更が加わったか
+        });
+
+        const dayDiv = document.createElement('div');
+        dayDiv.className = 'submit-day';
+        dayDiv.id = `req-day-${index}`;
+        dayDiv.onclick = () => openModal(index);
+        grid.appendChild(dayDiv);
+      });
+
+      renderSubmitGrid();
+    }
+
+    function renderSubmitGrid() {
+      requestData.forEach((data, index) => {
+        const div = document.getElementById(`req-day-${index}`);
+        let statusHtml = '<span style="color:#aaa;">未入力</span>';
+
+        if (data.requestedShift === "OFF") {
+          if (data.baseShift) {
+            // 元々シフトがあったのに休む場合（休み希望）
+            statusHtml = `<span class="status-off">${data.baseShift}</span><span class="badge-off">❌休</span>`;
+          } else {
+            // 元々ない日に「休」を入れた場合（表示しなくてもいいが念のため）
+            statusHtml = `<span class="badge-off">❌休</span>`;
+          }
+        } else if (data.requestedShift) {
+          if (!data.baseShift) {
+            // 元々休みの日に追加する場合
+            statusHtml = `<span class="status-add">${data.requestedShift}</span> <span class="badge-off">➕追加</span>`;
+          } else if (data.baseShift !== data.requestedShift) {
+            // 時間を変更する場合
+            statusHtml = `<span class="old-time">${data.baseShift}</span><span class="status-change">${data.requestedShift}</span> <span class="badge-off">🕒変更</span>`;
+          } else {
+            // 固定シフトそのまま
+            statusHtml = `<span>${data.requestedShift}</span>`;
+          }
+        }
+
+        div.innerHTML = `
+          <div class="day-label">${data.dateStr}</div>
+          <div class="shift-status">${statusHtml}</div>
+        `;
+      });
+    }
+
+    // --- モーダル制御 ---
+    function openModal(index) {
+      editingDayIndex = index;
+      const data = requestData[index];
+      document.getElementById('modalDateLabel').innerText = data.dateStr;
+      
+      // セレクトボックスの初期値設定（あれば）
+      if (data.requestedShift && data.requestedShift !== "OFF") {
+        const parts = data.requestedShift.split('-');
+        if(parts.length === 2) {
+          document.getElementById('modalStart').value = parts[0].trim();
+          document.getElementById('modalEnd').value = parts[1].trim();
+        }
       }
-      html += '</tbody></table>';
-      document.getElementById('tableContainer').innerHTML = html;
-
-      if (selectedHighlightName) {
-        applyHighlight();
-      }
+      document.getElementById('timeModal').style.display = 'flex';
     }
 
-    function onHighlightNameChange() {
-      selectedHighlightName = document.getElementById('highlightSelect').value;
-      applyHighlight();
+    function closeModal() { document.getElementById('timeModal').style.display = 'none'; }
+
+    function saveModalTime() {
+      const start = document.getElementById('modalStart').value;
+      const end = document.getElementById('modalEnd').value;
+      requestData[editingDayIndex].requestedShift = `${start}-${end}`;
+      requestData[editingDayIndex].isModified = true;
+      renderSubmitGrid();
+      closeModal();
     }
 
-    // 💡  th と td のインデックスのズレを完全に修正したハイライト処理
-    function applyHighlight() {
-      // 一度すべてのマスのハイライト（枠線）をクリア
-      document.querySelectorAll('#tableContainer td, #tableContainer th').forEach(el => {
-        el.style.outline = "";
-        el.style.boxShadow = "";
-      });
-
-      if (!selectedHighlightName || !currentData) return;
-
-      // 選択された名前が「左から何番目の列（列インデックス）」にあるかを探す
-      let colIdx = -1;
-      const headers = document.querySelectorAll('#tableContainer th');
-      headers.forEach((th, idx) => {
-        const nameNode = th.querySelector('.staff-name-header');
-        if (nameNode && nameNode.innerText.trim() === selectedHighlightName) {
-          colIdx = idx;
-        }
-      });
-
-      // 見つからない場合は処理を終了
-      if (colIdx === -1) return;
-
-      // 1. ヘッダーセルをハイライト
-      headers[colIdx].style.outline = "3px solid #e67e22";
-      headers[colIdx].style.boxShadow = "0 0 10px rgba(230, 126, 34, 0.5)";
-
-      // 2. その列のすべてのセル（日付ごと）をハイライト（💡 -1 を完全に排除しました）
-      document.querySelectorAll('#tableContainer tbody tr').forEach(row => {
-        const cells = row.querySelectorAll('td');
-        const td = cells[colIdx]; // 💡  th と完全に同じ列インデックス（colIdx）をそのまま指定します
-        if (td) {
-          td.style.outline = "3px solid #e67e22";
-        }
-      });
+    function setModalOff() {
+      requestData[editingDayIndex].requestedShift = "OFF";
+      requestData[editingDayIndex].isModified = true;
+      renderSubmitGrid();
+      closeModal();
     }
+
+    function resetModal() {
+      // 初期状態（ベースシフト）に戻す
+      requestData[editingDayIndex].requestedShift = requestData[editingDayIndex].baseShift;
+      requestData[editingDayIndex].isModified = false;
+      renderSubmitGrid();
+      closeModal();
+    }
+
+    // --- GASへの送信 ---
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwcpM3ildCLcNcIFJNlp_Nz7-ZKz6lS-WEjqZ3btnFPzWr98RhIAhHX-W4sRGVYmdzU/exec"; // WebアプリのURL
+
+    function submitRequestToGAS() {
+      const staffName = document.getElementById('requestNameSelect').value.split('_')[0];
+      
+      // 送信用にデータを整形（変更があったもの、または入力されたものだけ抽出など）
+      const payload = {
+        action: 'submitShiftRequest',
+        staffName: staffName,
+        requests: requestData.map(d => ({ date: d.dateStr, shift: d.requestedShift }))
+      };
+
+      console.log("送信データ:", payload);
+      alert("コンソールに送信データを表示しました（ここでGASへFetchします）");
+      
+      /* 本番用のFetch処理
+      showLoading();
+      fetch(GAS_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(data => {
+        hideLoading();
+        alert("シフト希望を提出しました！");
+        navTo('page-home');
+      });
+      */
+    }
+
+    // --- 既存のシフト確認用ダミー関数（エラー回避用） ---
+    function onMonthChange() {}
+    function loadStaffShiftData(type) {}
   </script>
 </body>
 </html>
